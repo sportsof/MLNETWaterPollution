@@ -1,14 +1,18 @@
 ﻿using ConsoleAppWaterPollution;
 using ConsoleAppWaterPollution.Models;
 using CsvHelper;
+using CsvHelper.Configuration;
 using Microsoft.ML;
 using Microsoft.ML.Transforms.TimeSeries;
 using System.Globalization;
+using System.Text;
 
 // Вологодская область	р. Волга	Нитрит-ионы
 
+var config = new CsvConfiguration(CultureInfo.CurrentCulture) { Delimiter = ",", Encoding = Encoding.UTF8 };
+
 using var streamReader = File.OpenText("high_pollution.csv");
-using var csvReader = new CsvReader(streamReader, CultureInfo.CurrentCulture);
+using var csvReader = new CsvReader(streamReader, config);
 
 var pollutuinsRaw = csvReader.GetRecords<PollutionRaw>();
 var trainingData = new List<Pollution>();
