@@ -37,6 +37,7 @@ foreach (var poll in pollutuinsRaw)
 }
 
 int windowSize = 12;
+int prognosisPeriod = 3;
 
 var forecaster = new Forecaster();
 
@@ -51,7 +52,7 @@ var trainingDataGroups = trainingData
 
 double rmse = 0;
 
-using var writer = new StreamWriter("x.csv");
+using var writer = new StreamWriter("submission.csv");
 using var csvWriter = new CsvWriter(writer, CultureInfo.CurrentCulture);
 
 csvWriter.WriteField("Subject");
@@ -69,25 +70,31 @@ foreach (var group in trainingDataGroups)
         .ToList();
     var completeDataWithGroup = DataManipulator.GetCompletePollution(dataWithGroup);
 
-    var trainData = completeDataWithGroup.Take(completeDataWithGroup.Count - 3).ToList();
-    var testData = completeDataWithGroup.Skip(completeDataWithGroup.Count - 3).Take(3).ToList();
+    var trainData = completeDataWithGroup.Take(completeDataWithGroup.Count - prognosisPeriod).ToList();
+    var testData = completeDataWithGroup.Skip(completeDataWithGroup.Count - prognosisPeriod).Take(prognosisPeriod).ToList();
 
     IDataView trainingViewData = forecaster.LoadFromEnumerable(trainData);
     IDataView testViewData = forecaster.LoadFromEnumerable(testData);
 
+    // Создание модели
     var estimator = forecaster.TrainWithForecast("Cnt_cases", windowSize, (int)trainingViewData.GetRowCount());
 
+    // Обучение
     var transformer = forecaster.GetSsaForecastingTransformer(estimator, trainingViewData);
 
+    // Создание движка для прогнозирования.
+    // На этом этапе можно зафиксировать модель в файл
     var forecastEngine = forecaster.GetForecastEngine(transformer);
 
-    var modelOutput = forecaster.Forecast(3, forecastEngine);
+    var modelOutput = forecaster.Forecast(prognosisPeriod, forecastEngine);
+
+    float v = modelOutput.Values[0] < 0 ? 0f : modelOutput.Values[0];
 
     csvWriter.WriteField(group.Subject);
     csvWriter.WriteField(group.River_basin);
     csvWriter.WriteField(group.Indicator);
     csvWriter.WriteField(testData[0].Cnt_cases);
-    csvWriter.WriteField(modelOutput.Values[0]);
+    csvWriter.WriteField(v);
     csvWriter.NextRecord();
 
     rmse += forecaster.GetMetric(testViewData, modelOutput.Values);
